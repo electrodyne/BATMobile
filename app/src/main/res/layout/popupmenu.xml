@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/popup"
+    android:layout_width="250dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/tv_menu"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:gravity="center"
+        android:background="@color/light_color"
+        android:textColor="@color/white"
+        android:text="Menu"
+        android:textSize="25sp" />
+
+    <TextView
+        android:id="@+id/tv_new_message"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:gravity="center"
+        android:background="@color/colorAccent"
+        android:textColor="@color/white"
+        android:text="New Message"
+        android:clickable="true"
+        android:onClick="New_Messg"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/tv_io_test"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:gravity="center"
+        android:background="@color/colorPrimary"
+        android:textColor="@color/white"
+        android:text="File I/O Test"
+        android:clickable="true"
+        android:onClick="Show_IO_Test"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/tv_ping"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:gravity="center"
+        android:background="@color/colorAccent"
+        android:textColor="@color/white"
+        android:text="Ping"
+        android:textSize="24sp" />
+</LinearLayout>
+</android.support.constraint.ConstraintLayout>

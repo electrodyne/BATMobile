@@ -1,0 +1,13 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="BATMobile_Theme" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">#5e5e5e</item>
+        <item name="colorPrimaryDark">#3e3e3e</item>
+        <item name="colorAccent">#3e3e3e</item>
+        <item name="android:colorBackground">#1e1e1e</item>
+        <item name="android:textColorPrimary">#ffffff</item>
+    </style>
+
+</resources>
