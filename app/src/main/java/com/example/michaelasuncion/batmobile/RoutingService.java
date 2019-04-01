@@ -14,7 +14,7 @@ import android.os.Parcelable;
 import android.util.Log;
 import android.widget.Toast;
 
-import org.parceler.Parcels;
+//import org.parceler.Parcels;
 
 import static android.content.ContentValues.TAG;
 
@@ -81,8 +81,8 @@ public class RoutingService extends Service {
                             localIntent.setAction(ACTION_ROUTE_TO_MSG_SRVC);   //TODO: TELL FileTransferService to "SEND_DATA_FROM_ROUTING_SRVC"
 
                             packet.generateRandomID();
-                            Parcelable wrappedPacket = Parcels.wrap(packet);
-                            localIntent.putExtra("packet", wrappedPacket); //sends the ogm address, type of packet (SOON)
+                           // Parcelable wrappedPacket = Parcels.wrap(packet);
+                         //   localIntent.putExtra("packet", wrappedPacket); //sends the ogm address, type of packet (SOON)
                             //Send packet..
                             //localIntent.putExtra("HOP_MSG", OGM_address);
 

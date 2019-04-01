@@ -11,7 +11,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcelable;
 
-import org.parceler.Parcels;
+//import org.parceler.Parcels;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -92,7 +92,7 @@ public class FileTransferService extends Service {
                 //destination address can be from phone number array.
                 //send_broadcast(Packet.DISCOVERY_PACKET + );
                 //sendmessage((long) p,"SYN_" + mnumber,true,mnumber);
-                Packet packet = Parcels.unwrap(intent.getParcelableExtra("packet"));
+               // Packet packet = Parcels.unwrap(intent.getParcelableExtra("packet"));
                 for(int f = 0; f < 7; f++){
                     String tempStr = "";
                     if(port_status[f] && port_activated[f]) {
@@ -104,7 +104,7 @@ public class FileTransferService extends Service {
                             }
                         }
                         //DISCOVERY_#packetID#_#2_#3_#1
-                        sendmessage(phone_number_list[f], Packet.DISCOVERY_PACKET + packet.getPacketID()+ "_" + tempStr + String.valueOf(phone_number_list[f]), false, packet.getOGMAddress());
+               //         sendmessage(phone_number_list[f], Packet.DISCOVERY_PACKET + packet.getPacketID()+ "_" + tempStr + String.valueOf(phone_number_list[f]), false, packet.getOGMAddress());
                     }
                 }
 

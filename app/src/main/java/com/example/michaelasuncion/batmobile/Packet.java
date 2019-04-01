@@ -2,7 +2,9 @@ package com.example.michaelasuncion.batmobile;
 
 import android.os.Parcelable;
 
-import org.parceler.Parcel;
+//import org.parceler.Parcel;
+//import org.parceler.ParcelConstructor;
+//import org.parceler.ParcelProperty;
 
 import java.util.Random;
 
@@ -17,7 +19,7 @@ import java.util.Random;
  5.) Message (optional)
  */
 
-@Parcel
+//@Parcel
 public class Packet {
     long packetID;
     String ogm_address;
@@ -25,7 +27,8 @@ public class Packet {
     public static final String DISCOVERY_PACKET =  "DISCOVERY_";
     public static final String MESSAGE_PACKET =  "MSSG_";
 
-    public Packet(String OGM) {
+ //   @ParcelConstructor
+    public Packet( String OGM) {
         this.ogm_address = OGM;
     }
 
