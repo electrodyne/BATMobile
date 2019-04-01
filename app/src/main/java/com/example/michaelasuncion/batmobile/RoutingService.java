@@ -24,7 +24,7 @@ public class RoutingService extends Service {
     Thread WorkingThread;
     private int PacketID;   //for debug only
     String OGM_address;
-    Boolean mIsHost;
+    Boolean mIsHost = false;
     Packet packet;
     public static final String ACTION_ROUTE_TO_MSG_SRVC = "com.example.michaelasuncion.batmobile.ACTION_ROUTE_TO_MSG_SRVC";
 
@@ -36,7 +36,8 @@ public class RoutingService extends Service {
     public void onCreate() {
         RoutingTable = openOrCreateDatabase("routing_table", MODE_PRIVATE, null);
         //RoutingTable.delete("route", null, null); //to refresh database every run. FOR DEBUG ONLY.
-        RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, destination_address VARCHAR NOT NULL, next_hop_address VARCHAR NOT NULL, ttl VARCHAR NOT NULL);");
+        //RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, destination_address VARCHAR NOT NULL, next_hop_address VARCHAR NOT NULL, ttl VARCHAR NOT NULL);");
+        RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, phone_number VARCHAR NOT NULL);");
         PacketID = 0;
         mRoutingBCR = new RoutingBCR();
         mRoutingBCRIFilter = new IntentFilter();
@@ -54,7 +55,7 @@ public class RoutingService extends Service {
     public class RoutingBCR extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            //TODO: Add function on this receiver. else don't register.
+            //TODO: Receive the Packet for client..
         }
     }
 
@@ -72,7 +73,7 @@ public class RoutingService extends Service {
                 public void run() {
                     while (true) { //discovery packet.
                         try {
-                            Thread.sleep(2000);
+                            Thread.sleep(2500);
                             //send discovery packet request to main thread (which will be passed on to FileTransferService
                             Intent localIntent = new Intent();
                             //localIntent.setAction(DISCOVERY_PACKET_REQUEST);
@@ -95,7 +96,7 @@ public class RoutingService extends Service {
                 }
             });
 
-            WorkingThread.start();
+            //WorkingThread.start();
         }
         return START_STICKY;
     }
@@ -136,6 +137,49 @@ public class RoutingService extends Service {
         return false;
     }
 
+    public boolean update(String phone_number){
+
+        //Search the dest address. If there is a dest address similar to the incoming packet. check TTL.
+        //if TTL_of_packet_to_be_inserted > TTL_@database, replace entry. else, disregard packet
+        //return TRUE if successfully replaced/inserted else FALSE.
+
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+phone_number+"'",null );
+
+        int CursorColumnIndex;
+        boolean willInsert = false;
+
+        if ( selection.getCount() > 0) {
+           /* selection.moveToFirst();
+
+            for(int i = 0; i < selection.getCount(); i++) {
+                //if TTL of incoming packet is Greater than of at the database, replace the content of database.
+                CursorColumnIndex = selection.getColumnIndex("ttl");
+                if (Integer.parseInt(TTL) > Integer.parseInt(selection.getString(CursorColumnIndex))) {
+                    //get ID of the initial data on the database
+                    RoutingTable.delete("route","id = ? ", new String[]{selection.getString(selection.getColumnIndex("id"))});
+                    willInsert = true;
+                }
+            }*/
+           willInsert = false;
+        } else willInsert = true;
+
+        if ( willInsert ) {
+            RoutingTable.execSQL(
+                    "INSERT INTO route(phone_number)" +
+                            "VALUES ('" + phone_number + "' )"
+
+            );
+            return true;
+        }
+        return false;
+    }
+
+    public boolean findByDestinationAddress(String destAddress) {
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+destAddress+"'",null );
+        if ( selection. getCount() > 0) return true;
+        else return false;
+    }
+
     /*
     public Envelope get(){
         //mEnvelope.set();
@@ -161,9 +205,9 @@ public class RoutingService extends Service {
 
 
     public class LocalBinder extends Binder {
-        RoutingService getService(String OGM_add, Boolean isHost) {
+        RoutingService getService(String OGM_add) {
             OGM_address = OGM_add;
-            mIsHost = isHost;
+
             return RoutingService.this;
         }
     }

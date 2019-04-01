@@ -17,10 +17,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 
 public class FileTransferService extends Service {
 
@@ -32,6 +34,7 @@ public class FileTransferService extends Service {
     BufferedReader[] in = new BufferedReader[14];
     PrintWriter[] out = new PrintWriter[14];
 
+    RoutingService mRoutingService;
     Intent test;
     boolean[] port_status = new boolean[7];
     boolean[] port_activated = new boolean[7];
@@ -85,18 +88,23 @@ public class FileTransferService extends Service {
         public void onReceive(Context context, Intent intent) {
 
             if (intent.getAction().equals(RoutingService.ACTION_ROUTE_TO_MSG_SRVC)){
-                //TODO: send to clients.. packet format: DISCOVERY_[PACKETID]_[OTHER CLIENT's ADDRESS]_[DestinationAddress]
+
                 //destination address can be from phone number array.
                 //send_broadcast(Packet.DISCOVERY_PACKET + );
                 //sendmessage((long) p,"SYN_" + mnumber,true,mnumber);
                 Packet packet = Parcels.unwrap(intent.getParcelableExtra("packet"));
                 for(int f = 0; f < 7; f++){
+                    String tempStr = "";
                     if(port_status[f] && port_activated[f]) {
+                        //for #1: DISCOVERY_#2_#3_#1 (last number is destination address)
                         for (int g = 0; g < 7; g++) {
                             if(port_status[g] && port_activated[g] && g != f) {
-                                sendmessage(phone_number_list[f], Packet.DISCOVERY_PACKET + "_" + packet.getPacketID()+ "_" + String.valueOf(phone_number_list[g]) + "_" + String.valueOf(phone_number_list[f]), false, packet.getOGMAddress());
+                                tempStr += phone_number_list[g];
+                                tempStr += "_";
                             }
                         }
+                        //DISCOVERY_#packetID#_#2_#3_#1
+                        sendmessage(phone_number_list[f], Packet.DISCOVERY_PACKET + packet.getPacketID()+ "_" + tempStr + String.valueOf(phone_number_list[f]), false, packet.getOGMAddress());
                     }
                 }
 
@@ -365,7 +373,8 @@ public class FileTransferService extends Service {
     }
 
     public class LocalBinder extends Binder{
-        FileTransferService getservice(){
+        FileTransferService getservice(RoutingService routingService){
+            mRoutingService = routingService;
             return FileTransferService.this;
         }
     }
@@ -475,18 +484,41 @@ public class FileTransferService extends Service {
                         sendBroadcast(test);
                     }else if(dummy[0].equals("ACK")){
                         phone_number_list[x] = Long.valueOf(dummy[1]);
-
+                        // Register the phone number above. dummy[1] is string.
+                        //id, phone#
+                        mRoutingService.update(dummy[1]); // updates the database. returns true if update is successful. //@TODO: REGISTER EACH CLIENTS.
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
                         test.putExtra("toast_name","ACK message: "+ parsed);
                         sendBroadcast(test);
                     }else if(dummy[0].equals("MSSG")){
+                        // Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[MESSAGE]
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
-                        test.putExtra("toast_name","Incoming message: "+ dummy[1]);
+                        if ( mRoutingService.findByDestinationAddress(dummy[2]) ) { //@TODO: CATCHES ALL MESSAGES AND ROUTES THEM ACCORDINGLY.
+                            // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
+                            sendmessage(Long.parseLong(dummy[2]),dummy[3],false,dummy[1]);
+                            test.putExtra("toast_name","Routed message: "+ dummy[1]);
+                        } else test.putExtra("toast_name","Message Routing Failed");
+
+
                         sendBroadcast(test);
                     }else if(dummy[0].equals("DISCOVERY")){
-                        //TODO: (Client side) parse the data important: Destination address. If = to my number (soon)
+
+                        //parsable data: dummy[0] : DISCOVERY
+                        // dummy[1] : neighbor1
+                        // dummy[2] : neighbor2
+                        // dummy[n] : neighbor[n]
+                        // dummy[n+1] : should be my address. loop store until I get my address.
+                        //String addressContainer = "";
+                        ArrayList<String> addressArrayContainer = new ArrayList<String>();
+                        int it = 0;
+                        while (true) {
+                            it++;
+                            if (dummy[it] == mnumber) break;
+                            addressArrayContainer.add(dummy[it]);
+                        }
+                        //pass addressArrayContainer to Routingservice. and register the address accordingly. (FOR INTRA ONLY) YET...
 
                     }
                     /*else if(dummy[0].equals("MULTIGROUP") && dummy[1].equals("START")){

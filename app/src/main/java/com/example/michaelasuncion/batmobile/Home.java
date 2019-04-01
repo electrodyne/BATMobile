@@ -104,7 +104,7 @@ public class Home extends AppCompatActivity{
                             new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
                 }
                 else{
-
+                    routingService.update(tmg.getLine1Number()); //TODO: ADD HOST's OWN ADDRESS.
                     ftservice.set_mnumber(tmg.getLine1Number());
                 }
 
@@ -117,7 +117,17 @@ public class Home extends AppCompatActivity{
                         }
                     });
                     ftservice.set_socket_host();
+
                     fts_started = true;
+                    //TODO: 1st event. Master is defined. (start routing service.) (disable discovery loop)
+                    //TODO: 2nd event. Master knows it's clients
+                    //TODO: register each of the client to Routing database
+                    //TODO: Use "ACK" message on FTS (where client numbers are being registered) as an event
+                    //-----ON this case all clients being registered are recorded on the database.
+                    //TODO: catch all messages coming from client/s ( because clients only knows you! (as a GO) )
+                    //TODO: route them accordingly through the ROUTING Table.
+                    //TODO: On Routing table, boolean findByDestinationAddress(String address) , if TRUE, send SENT to sender and Message to RECEIVER.
+
                 }
                 else if(!isBound)
                     show_toast("Service is not bound");
@@ -193,7 +203,7 @@ public class Home extends AppCompatActivity{
         Intent i = new Intent(this, FileTransferService.class);
         bindService(i,mConnection,Context.BIND_AUTO_CREATE);
 
-        Intent iRouting = new Intent(this, RoutingService.class);
+        Intent iRouting = new Intent(Home.this, RoutingService.class);
         bindService(iRouting, mRoutingServiceConn, Context.BIND_AUTO_CREATE);
 
         final String[] PERMISSIONS = {
@@ -260,7 +270,7 @@ public class Home extends AppCompatActivity{
             }
         });
 
-        startService(iRouting);
+        //startService(iRouting); //IAN: Disable for a while... Use only for discovery.
     }
 
     public void ShowPopUp(View v){
@@ -338,7 +348,7 @@ public class Home extends AppCompatActivity{
                             new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
                 }
                 //remove below if not necessary
-                test = "MSSG_" + test;
+                test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" +test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[message]
                 if(test.length() > 1024)
                     show_toast("String length > 1024");
                 else{
@@ -470,7 +480,7 @@ public class Home extends AppCompatActivity{
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             FileTransferService.LocalBinder b = (FileTransferService.LocalBinder) service;
-            ftservice = b.getservice();
+            ftservice = b.getservice(routingService);
             isBound = true;
         }
 
@@ -491,7 +501,7 @@ public class Home extends AppCompatActivity{
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(Home.this,
                         new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
-            } else routingService = b.getService(tmg.getLine1Number(), isHost);
+            } else routingService = b.getService(tmg.getLine1Number());
 
             //isBound = true;
         }
