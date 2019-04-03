@@ -104,7 +104,7 @@ public class Home extends AppCompatActivity{
                             new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
                 }
                 else{
-                    routingService.update(tmg.getLine1Number()); //TODO: ADD HOST's OWN ADDRESS.
+                //    routingService.update(tmg.getLine1Number()); //TODO: ADD HOST's OWN ADDRESS.
                     ftservice.set_mnumber(tmg.getLine1Number());
                 }
 

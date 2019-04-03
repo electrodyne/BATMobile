@@ -25,7 +25,7 @@ public class RoutingService extends Service {
     private int PacketID;   //for debug only
     String OGM_address;
     Boolean mIsHost = false;
-    Packet packet;
+    //Packet packet;
     public static final String ACTION_ROUTE_TO_MSG_SRVC = "com.example.michaelasuncion.batmobile.ACTION_ROUTE_TO_MSG_SRVC";
 
     /* for BCR */
@@ -43,7 +43,7 @@ public class RoutingService extends Service {
         mRoutingBCRIFilter = new IntentFilter();
         mRoutingBCRIFilter.addAction("TO_ROUTING");
         registerReceiver(mRoutingBCR, mRoutingBCRIFilter);
-        packet = new Packet(OGM_address);   //Register own OGM address.
+        //packet = new Packet(OGM_address);   //Register own OGM address.
     }
 
     @Override
@@ -80,7 +80,7 @@ public class RoutingService extends Service {
                             //localIntent.putExtra(DISCOVERY_PACKET_REQUEST, PacketID);
                             localIntent.setAction(ACTION_ROUTE_TO_MSG_SRVC);   //TODO: TELL FileTransferService to "SEND_DATA_FROM_ROUTING_SRVC"
 
-                            packet.generateRandomID();
+                      //      packet.generateRandomID();
                            // Parcelable wrappedPacket = Parcels.wrap(packet);
                          //   localIntent.putExtra("packet", wrappedPacket); //sends the ogm address, type of packet (SOON)
                             //Send packet..
@@ -176,7 +176,7 @@ public class RoutingService extends Service {
 
     public boolean findByDestinationAddress(String destAddress) {
         Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+destAddress+"'",null );
-        if ( selection. getCount() > 0) return true;
+        if ( selection.getCount() > 0) return true;
         else return false;
     }
 

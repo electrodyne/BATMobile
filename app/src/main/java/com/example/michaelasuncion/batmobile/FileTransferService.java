@@ -475,6 +475,7 @@ public class FileTransferService extends Service {
                     if(dummy[0].equals("SYN")){ //Makareceive lng nito is HOST. and [x] is a fixed value depending on port of client. therefore phone_number_list is legit.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         //sendmessage((long) x, "ACK_"+mnumber,true,mnumber);
+                        mRoutingService.update(dummy[1]);
                         Runnable y = new sendmessage_thread(x,"ACK_" + mnumber);
                         new Thread(y).start();
 
@@ -482,11 +483,11 @@ public class FileTransferService extends Service {
                         test.setAction("SHOW_TOAST");
                         test.putExtra("toast_name","SYN message: "+ parsed);
                         sendBroadcast(test);
-                    }else if(dummy[0].equals("ACK")){
+                    }else if(dummy[0].equals("ACK")){   ////Makareceive lng nito is CLIENT.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         // Register the phone number above. dummy[1] is string.
                         //id, phone#
-                        mRoutingService.update(dummy[1]); // updates the database. returns true if update is successful. //@TODO: REGISTER EACH CLIENTS.
+                         // updates the database. returns true if update is successful. //@TODO: REGISTER EACH CLIENTS.
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
                         test.putExtra("toast_name","ACK message: "+ parsed);
@@ -499,7 +500,7 @@ public class FileTransferService extends Service {
                             // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
                             sendmessage(Long.parseLong(dummy[2]),dummy[3],false,dummy[1]);
                             test.putExtra("toast_name","Routed message: "+ dummy[1]);
-                        } else test.putExtra("toast_name","Message Routing Failed");
+                        } else test.putExtra("toast_name","Routed message: "+ dummy[1]);
 
 
                         sendBroadcast(test);
