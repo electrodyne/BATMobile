@@ -62,7 +62,7 @@ public class Home extends AppCompatActivity{
     boolean isBound = false;
     boolean isHost = false;
     boolean fts_started = false;
-    RoutingService routingService;
+    public static RoutingService routingService;
 
     public static boolean hasPermissions(Context context, String... permissions) {
         if (context != null && permissions != null) {
@@ -146,6 +146,7 @@ public class Home extends AppCompatActivity{
                     }
 
                     ftservice.set_socket_client(groupOwnerAddress);
+                    fts_started = true;
                 }
                 else
                     show_toast("Client socket failed");
@@ -278,6 +279,20 @@ public class Home extends AppCompatActivity{
         dlg.show();
     }
 
+    public void Print_IO(String title, String message){
+        FileOutputStream fo;
+        try {
+            fo = openFileOutput(title, Context.MODE_PRIVATE);
+            fo.write(message.getBytes());
+            fo.close();
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+        Intent i = new Intent();
+        i.setAction("UPDATE_GUI");
+        sendBroadcast(i);
+    }
+
     public void Show_IO_Test(View v){
         dlg.setContentView(R.layout.io_test);
         dlg.show();
@@ -347,13 +362,23 @@ public class Home extends AppCompatActivity{
                     ActivityCompat.requestPermissions(Home.this,
                             new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
                 }
-                //remove below if not necessary
-                test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" +test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[message]
-                if(test.length() > 1024)
-                    show_toast("String length > 1024");
-                else{
-                    ftservice.sendmessage(Long.parseLong(send_to_string),test,false,tmg.getLine1Number());
-                    dlg.dismiss();
+                try {
+                    //TODO: Find "_" charater and change to another character or change the delimiter character to none ascii
+                    //remove below if not necessary
+                    test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" + test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[message]
+                    if (test.length() > 1024)
+                        show_toast("String length > 1024");
+                    else {
+                        if (fts_started) {
+                            if (isHost)
+                                ftservice.sendmessage(Long.parseLong(send_to_string), test, false, tmg.getLine1Number());
+                            else
+                                ftservice.sendmessage(Long.parseLong(FileTransferService.gonumber), test, false, tmg.getLine1Number());
+                        } else show_toast("FTS Not yet started.");
+                        dlg.dismiss();
+                    }
+                } catch (Exception e){
+                    Print_IO("Runtime Error", e.toString());
                 }
 
             }
@@ -480,7 +505,7 @@ public class Home extends AppCompatActivity{
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             FileTransferService.LocalBinder b = (FileTransferService.LocalBinder) service;
-            ftservice = b.getservice(routingService);
+            ftservice = b.getservice(Home.this);
             isBound = true;
         }
 

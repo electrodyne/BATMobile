@@ -34,7 +34,7 @@ public class FileTransferService extends Service {
     BufferedReader[] in = new BufferedReader[14];
     PrintWriter[] out = new PrintWriter[14];
 
-    RoutingService mRoutingService;
+    //RoutingService mRoutingService;
     Intent test;
     boolean[] port_status = new boolean[7];
     boolean[] port_activated = new boolean[7];
@@ -42,6 +42,8 @@ public class FileTransferService extends Service {
     public String mnumber;
     boolean multi_group_socket_running = false;
     boolean[] ip_addr_status = new boolean[256];
+    public static String gonumber;
+    Home home;
 
     /* IAN EDITS */
     private CommunicationReceiver communicationReceiver;
@@ -344,7 +346,7 @@ public class FileTransferService extends Service {
                     sendmessage((long) p,"SYN_" + mnumber,true,mnumber);
                 }catch(IOException e){
                     e.printStackTrace();
-                    if(x < 2530){
+                    if(x < 253){
                         Runnable s = new set_socket_client_multigroup_thread(x + 1);
                         new Thread(s).start();
                     }
@@ -373,8 +375,9 @@ public class FileTransferService extends Service {
     }
 
     public class LocalBinder extends Binder{
-        FileTransferService getservice(RoutingService routingService){
-            mRoutingService = routingService;
+        FileTransferService getservice(Home mHome){
+            home = mHome;
+            //mRoutingService = routingService;
             return FileTransferService.this;
         }
     }
@@ -475,7 +478,7 @@ public class FileTransferService extends Service {
                     if(dummy[0].equals("SYN")){ //Makareceive lng nito is HOST. and [x] is a fixed value depending on port of client. therefore phone_number_list is legit.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         //sendmessage((long) x, "ACK_"+mnumber,true,mnumber);
-                        mRoutingService.update(dummy[1]);
+                        Home.routingService.update(dummy[1]);
                         Runnable y = new sendmessage_thread(x,"ACK_" + mnumber);
                         new Thread(y).start();
 
@@ -485,25 +488,36 @@ public class FileTransferService extends Service {
                         sendBroadcast(test);
                     }else if(dummy[0].equals("ACK")){   ////Makareceive lng nito is CLIENT.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
-                        // Register the phone number above. dummy[1] is string.
+                        gonumber = dummy[1];
+                                // Register the phone number above. dummy[1] is string.
                         //id, phone#
-                         // updates the database. returns true if update is successful. //@TODO: REGISTER EACH CLIENTS.
+                         // updates the database. returns true if update is successful. //REGISTER EACH CLIENTS.
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
                         test.putExtra("toast_name","ACK message: "+ parsed);
                         sendBroadcast(test);
                     }else if(dummy[0].equals("MSSG")){
                         // Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[MESSAGE]
+                        if(dummy.length < 4) dummy[3] = " "; // to avoid no message error.
+
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
-                        if ( mRoutingService.findByDestinationAddress(dummy[2]) ) { //@TODO: CATCHES ALL MESSAGES AND ROUTES THEM ACCORDINGLY.
-                            // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
-                            sendmessage(Long.parseLong(dummy[2]),dummy[3],false,dummy[1]);
-                            test.putExtra("toast_name","Routed message: "+ dummy[1]);
-                        } else test.putExtra("toast_name","Routed message: "+ dummy[1]);
+                        try {
+                            if (Home.routingService.findByDestinationAddress(dummy[2])) { //CATCHES ALL MESSAGES AND ROUTES THEM ACCORDINGLY.
+                                // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
+                                sendmessage(Long.parseLong(dummy[2]), "MSSG_" + dummy[1] + "_" + dummy[2] + "_" + dummy[3], false, dummy[1]); //"MSSG_" + mnumber + "_" + dummy[2] + "_" +dummy[3]
+                                //test.putExtra("toast_name", "Routed message: " + dummy[3]);
+                                home.Print_IO("Routed from " + dummy[1] + " to " + dummy[2], dummy[3]);
+                            } else {
+                                home.Print_IO("From " + dummy[1], dummy[3] );
+                                //test.putExtra("toast_name", "Received Msg: " + dummy[3]);
+                            }
+                            sendBroadcast(test);
+                        } catch (Exception e){
+                            home.Print_IO("Runtime Error",e.toString() + "parsed: " + parsed);
+                        }
 
 
-                        sendBroadcast(test);
                     }else if(dummy[0].equals("DISCOVERY")){
 
                         //parsable data: dummy[0] : DISCOVERY
