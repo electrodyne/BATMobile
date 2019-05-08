@@ -58,11 +58,12 @@ public class Home extends AppCompatActivity{
     List<WifiP2pDevice> peers = new ArrayList<WifiP2pDevice>();
     String[] device_names;
     WifiP2pDevice[] device_array;
-    FileTransferService ftservice;
+    public static FileTransferService ftservice;
     boolean isBound = false;
-    boolean isHost = false;
-    boolean fts_started = false;
+    public static boolean isHost = false;
+    public static boolean fts_started = false;
     public static RoutingService routingService;
+    Intent iRouting;
 
     public static boolean hasPermissions(Context context, String... permissions) {
         if (context != null && permissions != null) {
@@ -87,6 +88,10 @@ public class Home extends AppCompatActivity{
     protected void onResume() {
         super.onResume();
         registerReceiver(mReceiver,mIntentFilter);
+    }
+
+    public void startRouting() {
+        startService(iRouting);
     }
 
     WifiP2pManager.ConnectionInfoListener connectionInfoListener = new WifiP2pManager.ConnectionInfoListener() {
@@ -119,14 +124,14 @@ public class Home extends AppCompatActivity{
                     ftservice.set_socket_host();
 
                     fts_started = true;
-                    //TODO: 1st event. Master is defined. (start routing service.) (disable discovery loop)
-                    //TODO: 2nd event. Master knows it's clients
-                    //TODO: register each of the client to Routing database
-                    //TODO: Use "ACK" message on FTS (where client numbers are being registered) as an event
+                    //1st event. Master is defined. (start routing service.) (disable discovery loop)
+                    //2nd event. Master knows it's clients
+                    //register each of the client to Routing database
+                    //Use "ACK" message on FTS (where client numbers are being registered) as an event
                     //-----ON this case all clients being registered are recorded on the database.
-                    //TODO: catch all messages coming from client/s ( because clients only knows you! (as a GO) )
-                    //TODO: route them accordingly through the ROUTING Table.
-                    //TODO: On Routing table, boolean findByDestinationAddress(String address) , if TRUE, send SENT to sender and Message to RECEIVER.
+                    //catch all messages coming from client/s ( because clients only knows you! (as a GO) )
+                    //route them accordingly through the ROUTING Table.
+                    //On Routing table, boolean findByDestinationAddress(String address) , if TRUE, send SENT to sender and Message to RECEIVER.
 
                 }
                 else if(!isBound)
@@ -204,7 +209,7 @@ public class Home extends AppCompatActivity{
         Intent i = new Intent(this, FileTransferService.class);
         bindService(i,mConnection,Context.BIND_AUTO_CREATE);
 
-        Intent iRouting = new Intent(Home.this, RoutingService.class);
+        iRouting = new Intent(Home.this, RoutingService.class);
         bindService(iRouting, mRoutingServiceConn, Context.BIND_AUTO_CREATE);
 
         final String[] PERMISSIONS = {
@@ -363,22 +368,32 @@ public class Home extends AppCompatActivity{
                             new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
                 }
                 try {
-                    //TODO: Find "_" charater and change to another character or change the delimiter character to none ascii
+                    // Find "_" charater and change to another character or change the delimiter character to none ascii
                     //remove below if not necessary
-                    test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" + test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[message]
+                    // @TODO Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]
+                    test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" + ftservice.mnumber + "_" + test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[Original source number]_[message]
                     if (test.length() > 1024)
                         show_toast("String length > 1024");
                     else {
                         if (fts_started) {
-                            if (isHost)
-                                ftservice.sendmessage(Long.parseLong(send_to_string), test, false, tmg.getLine1Number());
-                            else
-                                ftservice.sendmessage(Long.parseLong(FileTransferService.gonumber), test, false, tmg.getLine1Number());
+                            //if (isHost)
+                            //TODO: check first on whom to send by searching the name of consignee on DB and check if it has a redirect. if direct_address == mnumber, send directly. else use the direct address for sending the packet
+                              //  if (routingService.findByDestinationAddress(send_to_string) ) {
+                                 //   if (routingService.getDirectLineAddress(send_to_string).equals(FileTransferService.mnumber)) ftservice.sendmessage(Long.parseLong(send_to_string), test, false, tmg.getLine1Number());
+                                 //   else {
+                                        ftservice.sendmessage(Long.parseLong(routingService.getDirectLineAddress(send_to_string)), test, false, tmg.getLine1Number());
+                                        show_toast("Message sent!");
+                                        //Print_IO("Inter: Routed to ", routingService.getDirectLineAddress(send_to_string));
+                                 //   }
+                              //  }
+                              //  else show_toast("Address not found on Database");
+                        //    else
+                        //        ftservice.sendmessage(Long.parseLong(FileTransferService.gonumber), test, false, tmg.getLine1Number());
                         } else show_toast("FTS Not yet started.");
                         dlg.dismiss();
                     }
                 } catch (Exception e){
-                    Print_IO("Runtime Error", e.toString());
+                    //Print_IO("Runtime Error", e.toString());
                 }
 
             }

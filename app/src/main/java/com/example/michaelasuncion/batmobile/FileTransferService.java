@@ -39,7 +39,7 @@ public class FileTransferService extends Service {
     boolean[] port_status = new boolean[7];
     boolean[] port_activated = new boolean[7];
     long[] phone_number_list = new long[14];    //Check if we can use this just set this as static. to be able to access outside
-    public String mnumber;
+    public static String mnumber;
     boolean multi_group_socket_running = false;
     boolean[] ip_addr_status = new boolean[256];
     public static String gonumber;
@@ -268,6 +268,7 @@ public class FileTransferService extends Service {
 
                 sendmessage((long) p,"SYN_" + mnumber,true,mnumber);
 
+                //home.Print_IO("CHECK MNUMBER ", mnumber );
                 //get IP address here once connection is established
                 InetAddress inetAddress = socket[p].getLocalAddress();
                 byte[] bleh = inetAddress.getAddress();
@@ -383,15 +384,33 @@ public class FileTransferService extends Service {
     }
 
     public void sendmessage(long num_receiver,String s, boolean port, String num_sender){
+
         int f;
         for(f = 0; f < 14; f++){
             if(phone_number_list[f] == num_receiver)
                 break;
         }
+        int dbcount = Home.routingService.getDBCount();
+        Packet tempPacket = new Packet();
+        String tempStr = "";
+        for( int l = 0; l < dbcount; l++) {
+
+            tempPacket = Home.routingService.getData(l);
+            //select 1 until the last and send it.
+            tempStr += tempPacket.phone_number;
+            tempStr += ",";
+            tempStr += tempPacket.direct_connection;
+            tempStr += ",";
+            tempStr += tempPacket.distance;
+            tempStr += "\n";
+
+        }
+        home.Print_IO("Routing table (address, relay, distance)", tempStr);
         if(f >= 14){
             Intent i = new Intent();
             i.setAction("SHOW_TOAST");
             i.putExtra("toast_name","Number does not exist");
+            //home.Print_IO("Number Does not exist" , );
             sendBroadcast(i);
         }
         if(port){
@@ -458,9 +477,11 @@ public class FileTransferService extends Service {
             char[] incomingmessage = new char[1024];
             StringBuilder sb = new StringBuilder(1024);
             int num = 0;
-
+            Packet tempPacket = new Packet();
+            int tempDistance = 0;
             while(true){
                 try{
+
                     in[x].read(incomingmessage,0,1024);
                     dummy = String.valueOf(incomingmessage).split("\\n");
                     for(num = 0; num < dummy.length - 1; num++) {
@@ -475,21 +496,58 @@ public class FileTransferService extends Service {
 
                     String parsed = sb.toString();
                     dummy = parsed.split("_");
-                    if(dummy[0].equals("SYN")){ //Makareceive lng nito is HOST. and [x] is a fixed value depending on port of client. therefore phone_number_list is legit.
+                    if(dummy[0].equals("SYN")){
+                        //Makareceive lng nito is HOST. and [x] is a fixed value depending on port of client. therefore phone_number_list is legit.
+                        //CLIENT lang nagsesend nito.
+
+                        home.startRouting();
+                        //Start Routing.
+
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         //sendmessage((long) x, "ACK_"+mnumber,true,mnumber);
-                        Home.routingService.update(dummy[1]);
+                        //home.Print_IO("SYN CONTENT (GO SIDE)", dummy[0] + "_" + dummy[1] + "_" + dummy[2]);
+
+                        /*
+                        Home.routingService.update(mnumber, "INTER", mnumber, "0");
+                        try {
+                            Home.routingService.update(dummy[2], dummy[1], mnumber, "0");
+                        } catch (Exception e) {
+                            home.Print_IO("ERROR", e.toString());
+                        }
+                        */
                         Runnable y = new sendmessage_thread(x,"ACK_" + mnumber);
+                        //send discovery packet also.
                         new Thread(y).start();
+                        /*
+                        int dbcount = Home.routingService.getDBCount();
+
+                        for( int l = 0; l < dbcount; l++) {
+
+                            tempPacket = Home.routingService.getData(l);
+                            //select 1 until the last and send it.
+                            send_broadcast("DISCO_" + tempPacket.classification + "_" + tempPacket.phone_number + "_" + tempPacket.direct_connection + "_" + tempPacket.distance);
+                        }
+                        */
 
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
-                        test.putExtra("toast_name","SYN message: "+ parsed);
+                                test.putExtra("toast_name","SYN message: "+ parsed);
                         sendBroadcast(test);
                     }else if(dummy[0].equals("ACK")){   ////Makareceive lng nito is CLIENT.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         gonumber = dummy[1];
-                                // Register the phone number above. dummy[1] is string.
+                        home.startRouting();
+                        //home.Print_IO("ACK CONTENT (GM SIDE)", dummy[0] + "_" + dummy[1] + "_" + dummy[2]);
+
+                        /*
+                        try{
+                            Home.routingService.update(dummy[2], dummy[1], dummy[2], "0");
+                        } catch (Exception e) {
+                            home.Print_IO("ERROR", e.toString());
+                        }
+
+                        */
+                                // Register the phon    e number above. dummy[1] is string.
                         //id, phone#
                          // updates the database. returns true if update is successful. //REGISTER EACH CLIENTS.
                         test = new Intent();
@@ -497,28 +555,70 @@ public class FileTransferService extends Service {
                         test.putExtra("toast_name","ACK message: "+ parsed);
                         sendBroadcast(test);
                     }else if(dummy[0].equals("MSSG")){
-                        // Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[MESSAGE]
-                        if(dummy.length < 4) dummy[3] = " "; // to avoid no message error.
-
+                        // @TODO Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]
+                        if(dummy.length < 5) dummy[4] = " "; // to avoid no message error.
+                        //home.Print_IO("Content Of Message", dummy[0] + "_" + dummy[1] + "_" + dummy[2] + "_" + dummy[3] + "_" + dummy[4]);
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
                         try {
-                            if (Home.routingService.findByDestinationAddress(dummy[2])) { //CATCHES ALL MESSAGES AND ROUTES THEM ACCORDINGLY.
+                            if (dummy[2].equals(mnumber)){
+                                home.Print_IO("From " + dummy[3], dummy[4]);
+                            }
+                            else {
                                 // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
-                                sendmessage(Long.parseLong(dummy[2]), "MSSG_" + dummy[1] + "_" + dummy[2] + "_" + dummy[3], false, dummy[1]); //"MSSG_" + mnumber + "_" + dummy[2] + "_" +dummy[3]
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[2])), "MSSG_" + mnumber + "_" + dummy[2] + "_" + dummy[3] + "_" + dummy[4], false, dummy[1]); //"MSSG_" + mnumber + "_" + dummy[2] + "_" +dummy[3]
                                 //test.putExtra("toast_name", "Routed message: " + dummy[3]);
-                                home.Print_IO("Routed from " + dummy[1] + " to " + dummy[2], dummy[3]);
-                            } else {
-                                home.Print_IO("From " + dummy[1], dummy[3] );
-                                //test.putExtra("toast_name", "Received Msg: " + dummy[3]);
+                                home.Print_IO("Routed from " + dummy[1] + " to " + dummy[2], dummy[4]);
+
                             }
                             sendBroadcast(test);
                         } catch (Exception e){
-                            home.Print_IO("Runtime Error",e.toString() + "parsed: " + parsed);
+                           // home.Print_IO("Runtime Error",e.toString() + "parsed: " + parsed);
                         }
 
 
-                    }else if(dummy[0].equals("DISCOVERY")){
+                    }else if(dummy[0].equals("DISCO")){
+                        //DISCO_[gm1]_[gm1]_1
+                            //update table
+                            //increment distance + 1
+                            //broadcast a disco packet to all sockets DISCO_[gm1]_[go1]_2
+                            //reply to gm1: DISCOREC_[gm1]_[go1]_[go1]_1
+                        //DISCO_[go2]_[gm1]_2
+
+                        //@TODO DISCO_[phone_number endorsed]_[direct_connection_address]_[distance]
+
+                        try {
+                            if (!dummy[1].equals(mnumber)) {
+                                tempPacket.phone_number = dummy[1];
+                                tempPacket.direct_connection = dummy[2];
+                                tempPacket.distance = dummy[3];
+                                tempPacket.classification = "INTRA";    //just a placeholder. no use anymore
+                                Home.routingService.update(tempPacket);
+                                tempDistance = Integer.parseInt(dummy[3]) + 1;
+                                send_broadcast("DISCO_" + dummy[1] + "_" + mnumber + "_" + tempDistance);
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + mnumber + "_1", false, mnumber); //Instance 1
+                            }
+                                /*
+                            if (!dummy[2].equals(mnumber)) {
+                                tempPacket.classification = dummy[1];
+                                tempPacket.phone_number = dummy[2];
+                                tempPacket.direct_connection = dummy[3];
+                                if (gonumber.equals(dummy[2]))
+                                    tempPacket.distance = String.valueOf(Integer.parseInt(dummy[4]));
+                                else
+                                    tempPacket.distance = String.valueOf(Integer.parseInt(dummy[4]) + 1);
+                                Home.routingService.update(tempPacket);
+                            }
+                            */
+                        }catch (Exception e) {
+                         //   home.Print_IO("Discovery", e.toString());
+
+                        }
+                        //check existance of the address on DB.
+                        //if existing check the distance.
+                        //  if distance.new < distance.old) replace the old with new.
+                        //else
+
 
                         //parsable data: dummy[0] : DISCOVERY
                         // dummy[1] : neighbor1
@@ -526,14 +626,29 @@ public class FileTransferService extends Service {
                         // dummy[n] : neighbor[n]
                         // dummy[n+1] : should be my address. loop store until I get my address.
                         //String addressContainer = "";
-                        ArrayList<String> addressArrayContainer = new ArrayList<String>();
-                        int it = 0;
-                        while (true) {
-                            it++;
-                            if (dummy[it] == mnumber) break;
-                            addressArrayContainer.add(dummy[it]);
+
+
+
+                    } else if(dummy[0].equals("DISCOREC")){
+                        try {
+                            //@TODO DISCOREC_[phone_number endorsed]_[last hop device/path]_[responder address]_distance
+                            //2 receipeintes: 1-relay, 1-destination
+                            //DISCOREC_gm1_go2_go2_1
+                            //check the content of dummy[1]. if == to mnumber, update table with [add = responder add, relay=last hop, distance = distance]
+                            if (dummy[1].equals(mnumber)) {
+                                tempPacket.phone_number = dummy[3];
+                                tempPacket.direct_connection = dummy[2];
+                                tempPacket.distance = dummy[4];
+                                tempPacket.classification = "INTRA";    //just a placeholder. no use anymore
+                                Home.routingService.update(tempPacket);
+                            } else {
+                                tempDistance = Integer.parseInt(dummy[4]) + 1;
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + dummy[3] + "_" + tempDistance, false, mnumber);
+                            }
+                        } catch (Exception e) {
+                           // home.Print_IO("Discovery", e.toString());
+
                         }
-                        //pass addressArrayContainer to Routingservice. and register the address accordingly. (FOR INTRA ONLY) YET...
 
                     }
                     /*else if(dummy[0].equals("MULTIGROUP") && dummy[1].equals("START")){

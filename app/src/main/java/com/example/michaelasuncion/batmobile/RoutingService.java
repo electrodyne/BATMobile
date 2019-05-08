@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Binder;
 import android.os.IBinder;
@@ -37,7 +38,7 @@ public class RoutingService extends Service {
         RoutingTable = openOrCreateDatabase("routing_table", MODE_PRIVATE, null);
         //RoutingTable.delete("route", null, null); //to refresh database every run. FOR DEBUG ONLY.
         //RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, destination_address VARCHAR NOT NULL, next_hop_address VARCHAR NOT NULL, ttl VARCHAR NOT NULL);");
-        RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, phone_number VARCHAR NOT NULL);");
+        RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, phone_number VARCHAR NOT NULL, classification VARCHAR NOT NULL, direct_address VARCHAR NOT NULL, distance VARCHAR NOT NULL);");
         PacketID = 0;
         mRoutingBCR = new RoutingBCR();
         mRoutingBCRIFilter = new IntentFilter();
@@ -67,27 +68,19 @@ public class RoutingService extends Service {
         * so send group members the table content.
         * */
         Toast.makeText(this, "Routing Service has started.", Toast.LENGTH_SHORT).show();
-        if (mIsHost) {  //Fire discovery thread only for hosts.
+       // if (mIsHost) {  //Fire discovery thread only for hosts.
             WorkingThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     while (true) { //discovery packet.
                         try {
-                            Thread.sleep(2500);
-                            //send discovery packet request to main thread (which will be passed on to FileTransferService
-                            Intent localIntent = new Intent();
-                            //localIntent.setAction(DISCOVERY_PACKET_REQUEST);
-                            //localIntent.putExtra(DISCOVERY_PACKET_REQUEST, PacketID);
-                            localIntent.setAction(ACTION_ROUTE_TO_MSG_SRVC);   //TODO: TELL FileTransferService to "SEND_DATA_FROM_ROUTING_SRVC"
 
-                      //      packet.generateRandomID();
-                           // Parcelable wrappedPacket = Parcels.wrap(packet);
-                         //   localIntent.putExtra("packet", wrappedPacket); //sends the ogm address, type of packet (SOON)
-                            //Send packet..
-                            //localIntent.putExtra("HOP_MSG", OGM_address);
-
-                            sendBroadcast(localIntent);
-
+                            if ( Home.fts_started == true) {
+                                //send discovery packet to GO / GM with Distance = 0
+                                Thread.sleep(2500);
+                                //@TODO DISCO_mnumber_mnumber_0     -- cycle zero
+                                Home.ftservice.send_broadcast("DISCO_" + FileTransferService.mnumber + "_" + FileTransferService.mnumber + "_1");
+                            }
 
                         } catch (InterruptedException e) {
                             Log.e(TAG, "run: " + e.toString());
@@ -96,8 +89,8 @@ public class RoutingService extends Service {
                 }
             });
 
-            //WorkingThread.start();
-        }
+            WorkingThread.start();
+        //}
         return START_STICKY;
     }
 
@@ -137,7 +130,7 @@ public class RoutingService extends Service {
         return false;
     }
 
-    public boolean update(String phone_number){
+    public boolean update(String phone_number, String classif, String direct_add, String dist){
 
         //Search the dest address. If there is a dest address similar to the incoming packet. check TTL.
         //if TTL_of_packet_to_be_inserted > TTL_@database, replace entry. else, disregard packet
@@ -149,24 +142,21 @@ public class RoutingService extends Service {
         boolean willInsert = false;
 
         if ( selection.getCount() > 0) {
-           /* selection.moveToFirst();
-
-            for(int i = 0; i < selection.getCount(); i++) {
-                //if TTL of incoming packet is Greater than of at the database, replace the content of database.
-                CursorColumnIndex = selection.getColumnIndex("ttl");
-                if (Integer.parseInt(TTL) > Integer.parseInt(selection.getString(CursorColumnIndex))) {
-                    //get ID of the initial data on the database
-                    RoutingTable.delete("route","id = ? ", new String[]{selection.getString(selection.getColumnIndex("id"))});
-                    willInsert = true;
-                }
-            }*/
+            selection.moveToFirst();
+            int tempDistance = Integer.parseInt(selection.getString(selection.getColumnIndex("distance")));
+            if (tempDistance > Integer.parseInt(dist)) {
+                RoutingTable.execSQL(
+                        "UPDATE route SET phone_number = '"+phone_number+"', classification = '"+classif+"', direct_address = '"+direct_add+"', distance = '"+dist+"') " +
+                                "WHERE phone_number = '"+ phone_number +"';"
+                );
+            }
            willInsert = false;
         } else willInsert = true;
 
         if ( willInsert ) {
             RoutingTable.execSQL(
-                    "INSERT INTO route(phone_number)" +
-                            "VALUES ('" + phone_number + "' )"
+                    "INSERT INTO route(phone_number, classification, direct_address, distance)" +
+                            "VALUES ('" + phone_number + "',  '" + classif + "', '"+ direct_add +"', '"+ dist +"')"
 
             );
             return true;
@@ -174,10 +164,75 @@ public class RoutingService extends Service {
         return false;
     }
 
+    public boolean update(Packet iPacket) {
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+ iPacket.phone_number +"'",null );
+        try {
+            if (selection.getCount() > 0) {
+                selection.moveToFirst();
+                int tempDistance = Integer.parseInt(selection.getString(selection.getColumnIndex("distance")));
+                if (tempDistance > Integer.parseInt(iPacket.distance)) {
+                    RoutingTable.execSQL(
+                            "UPDATE route SET phone_number = '"+iPacket.phone_number+"', classification = '"+iPacket.classification+"', direct_address = '"+iPacket.direct_connection+"', distance = '"+iPacket.distance+"') " +
+                                    "WHERE phone_number = '"+ iPacket.phone_number +"';"
+                    );
+                }
+            } else {
+                RoutingTable.execSQL(
+                        "INSERT INTO route(phone_number, classification, direct_address, distance)" +
+                                "VALUES ('" + iPacket.phone_number + "',  '" + iPacket.classification + "', '" + iPacket.direct_connection + "', '" + iPacket.distance + "')"
+
+                );
+            }
+            return true;
+        }catch (Exception e){
+            return false;
+        }
+    }
+
     public boolean findByDestinationAddress(String destAddress) {
         Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+destAddress+"'",null );
         if ( selection.getCount() > 0) return true;
         else return false;
+    }
+
+    public Packet getData( int index ) {    //position is 0 index
+        Packet pReturn = new Packet();
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route",null );
+        selection.moveToPosition(index);    //zero based
+        pReturn.direct_connection = selection.getString(selection.getColumnIndex("direct_address"));
+        pReturn.distance = selection.getString(selection.getColumnIndex("distance"));
+        pReturn.phone_number = selection.getString(selection.getColumnIndex("phone_number"));
+        pReturn.classification = selection.getString(selection.getColumnIndex("classification"));
+        return pReturn;
+    }
+
+    public String getDirectLineAddress(String phoneNum ) {
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+phoneNum+"'",null );
+        if ( selection.getCount() > 0) {
+            selection.moveToFirst();
+            return selection.getString(selection.getColumnIndex("direct_address"));
+        } else return "NAN";
+    }
+
+    public int getDBCount() {
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route",null );
+        return selection.getCount();
+    }
+    //@return => Classification (INTER or INTRA)
+    public String getClassification(String destAddress) { //used to get the classification of the said @address
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE phone_number = '"+destAddress+"'",null );
+        if ( selection.getCount() > 0) {
+            selection.moveToFirst();
+            return selection.getString(selection.getColumnIndex("classification"));
+        } else return "NAN";
+    }
+
+    public String getFirstInterAddress() { //used to get the classification of the said @address
+        Cursor selection = RoutingTable.rawQuery("SELECT * from route WHERE classification = 'INTER'",null );
+        if ( selection.getCount() > 0) {
+            selection.moveToFirst();
+            return selection.getString(selection.getColumnIndex("phone_number"));
+        } else return "NAN";
     }
 
     /*
