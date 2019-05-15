@@ -28,7 +28,7 @@ public class RoutingService extends Service {
     Boolean mIsHost = false;
     //Packet packet;
     public static final String ACTION_ROUTE_TO_MSG_SRVC = "com.example.michaelasuncion.batmobile.ACTION_ROUTE_TO_MSG_SRVC";
-
+    Home home;
     /* for BCR */
     RoutingBCR mRoutingBCR;
     IntentFilter mRoutingBCRIFilter;
@@ -36,7 +36,7 @@ public class RoutingService extends Service {
     @Override
     public void onCreate() {
         RoutingTable = openOrCreateDatabase("routing_table", MODE_PRIVATE, null);
-        //RoutingTable.delete("route", null, null); //to refresh database every run. FOR DEBUG ONLY.
+        RoutingTable.delete("route", null, null); //to refresh database every run. FOR DEBUG ONLY.
         //RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, destination_address VARCHAR NOT NULL, next_hop_address VARCHAR NOT NULL, ttl VARCHAR NOT NULL);");
         RoutingTable.execSQL("CREATE TABLE IF NOT EXISTS route(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, phone_number VARCHAR NOT NULL, classification VARCHAR NOT NULL, direct_address VARCHAR NOT NULL, distance VARCHAR NOT NULL);");
         PacketID = 0;
@@ -60,6 +60,28 @@ public class RoutingService extends Service {
         }
     }
 
+    public void startPingTimer(final long timeout) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Home.isTimeRunning = true;
+                while(true) {
+                    try {
+                        if ( (System.currentTimeMillis() - Home.timestart) > timeout  || Home.isTimeRunning == false) {
+                            Home.isTimeRunning = false;
+                            break;
+                        }
+                    }catch (Exception e) {
+                        home.Print_IO("Ping Service", e.toString());
+                    }
+                }
+            }
+        });
+
+
+
+    }
+
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -79,7 +101,7 @@ public class RoutingService extends Service {
                                 //send discovery packet to GO / GM with Distance = 0
                                 Thread.sleep(2500);
                                 //@TODO DISCO_mnumber_mnumber_0     -- cycle zero
-                                Home.ftservice.send_broadcast("DISCO_" + FileTransferService.mnumber + "_" + FileTransferService.mnumber + "_1");
+                                Home.ftservice.send_broadcast("DISCO_" + FileTransferService.mnumber + "_" + FileTransferService.mnumber + "_1_F");
                             }
 
                         } catch (InterruptedException e) {
@@ -260,8 +282,9 @@ public class RoutingService extends Service {
 
 
     public class LocalBinder extends Binder {
-        RoutingService getService(String OGM_add) {
+        RoutingService getService(String OGM_add, Home hommie) {
             OGM_address = OGM_add;
+            home = hommie;
 
             return RoutingService.this;
         }

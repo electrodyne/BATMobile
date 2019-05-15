@@ -6,10 +6,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.wifi.WifiInfo;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcelable;
+import android.text.format.Formatter;
 
 //import org.parceler.Parcels;
 
@@ -43,9 +45,10 @@ public class FileTransferService extends Service {
     boolean multi_group_socket_running = false;
     boolean[] ip_addr_status = new boolean[256];
     public static String gonumber;
+    Integer blacklist;
     Home home;
 
-    /* IAN EDITS */
+    /* Jonas EDITS */
     private CommunicationReceiver communicationReceiver;
     IntentFilter mIntentFilter;
     final Handler mHandler = new Handler();
@@ -60,6 +63,7 @@ public class FileTransferService extends Service {
         for(f = 0; f < 256; f++){
             ip_addr_status[f] = false;
         }
+        blacklist = 0;
         multi_group_socket_running = false;
 
         communicationReceiver = new CommunicationReceiver(mHandler);
@@ -83,7 +87,7 @@ public class FileTransferService extends Service {
         private final Handler CommsHandler;
 
         public CommunicationReceiver (Handler handler) {
-            CommsHandler = handler; //use only if there is something you want to process. else not needed. -IAN
+            CommsHandler = handler; //use only if there is something you want to process. else not needed. -Jonas
         }
 
         @Override
@@ -323,7 +327,7 @@ public class FileTransferService extends Service {
                 test.setAction("SHOW_TOAST");
                 test.putExtra("toast_name","No more available ports");
             }
-            else if(ip_addr_status[(x % 253) + 2]){
+            else if(ip_addr_status[(x % 253) + 2] || ((x % 253) + 2) == blacklist ){
                 Runnable s = new set_socket_client_multigroup_thread(x + 1);
                 new Thread(s).start();
             }
@@ -331,7 +335,7 @@ public class FileTransferService extends Service {
                 try{
                     InetAddress IP_addr = InetAddress.getByAddress(ip);
                     socket[p] = new Socket();
-                    socket[p].connect(new InetSocketAddress(IP_addr,2094),75);
+                    socket[p].connect(new InetSocketAddress(IP_addr,2094),10);
 
                     out[p] = new PrintWriter(socket[p].getOutputStream(), true);
                     in[p] = new BufferedReader(new InputStreamReader(socket[p].getInputStream()));
@@ -486,8 +490,8 @@ public class FileTransferService extends Service {
                     dummy = String.valueOf(incomingmessage).split("\\n");
                     for(num = 0; num < dummy.length - 1; num++) {
                         sb.append(dummy[num]);
-                        if(num != dummy.length -2)
-                            sb.append('\n');
+                        if(num != dummy.length -2)  //assuming MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]
+                            sb.append('\n');    //Papasok dito pag num = 0,1,2,3
                     }
                     //test = new Intent();
                     //test.setAction("SHOW_TOAST");
@@ -515,7 +519,14 @@ public class FileTransferService extends Service {
                             home.Print_IO("ERROR", e.toString());
                         }
                         */
-                        Runnable y = new sendmessage_thread(x,"ACK_" + mnumber);
+                        WifiInfo wifi_info = home.wifimanager.getConnectionInfo();
+                        int ip = wifi_info.getIpAddress();
+                        String ip_string = Formatter.formatIpAddress(ip);
+                        String buffer[] = ip_string.split("\\.");
+                        Integer will_be_blacklisted = Integer.valueOf(buffer[3]);
+                        home.Print_IO("SYN received", ip_string + "\nBlacklisting: "+ will_be_blacklisted );
+
+                        Runnable y = new sendmessage_thread(x,"ACK_" + mnumber + "_" + will_be_blacklisted + "_F" );
                         //send discovery packet also.
                         new Thread(y).start();
                         /*
@@ -531,12 +542,16 @@ public class FileTransferService extends Service {
 
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
-                                test.putExtra("toast_name","SYN message: "+ parsed);
+                        test.putExtra("toast_name","SYN message: "+ parsed);
                         sendBroadcast(test);
                     }else if(dummy[0].equals("ACK")){   ////Makareceive lng nito is CLIENT.
                         phone_number_list[x] = Long.valueOf(dummy[1]);
                         gonumber = dummy[1];
+
+                        //home.Print_IO("ACK received",gonumber + "\nBlacklisting: " + dummy[2]);
+                        blacklist = Integer.valueOf(dummy[2]);
                         home.startRouting();
+
                         //home.Print_IO("ACK CONTENT (GM SIDE)", dummy[0] + "_" + dummy[1] + "_" + dummy[2]);
 
                         /*
@@ -554,9 +569,11 @@ public class FileTransferService extends Service {
                         test.setAction("SHOW_TOAST");
                         test.putExtra("toast_name","ACK message: "+ parsed);
                         sendBroadcast(test);
+
+                        set_socket_client_multigroup();
                     }else if(dummy[0].equals("MSSG")){
-                        // @TODO Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]
-                        if(dummy.length < 5) dummy[4] = " "; // to avoid no message error.
+                        // @TODO Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]_F
+                        if(dummy.length < 6) dummy[4] = " "; // to avoid no message error.
                         //home.Print_IO("Content Of Message", dummy[0] + "_" + dummy[1] + "_" + dummy[2] + "_" + dummy[3] + "_" + dummy[4]);
                         test = new Intent();
                         test.setAction("SHOW_TOAST");
@@ -566,7 +583,7 @@ public class FileTransferService extends Service {
                             }
                             else {
                                 // if ( destination address is exsisting in routing table ) resend the message to [TO_ADDRESS]
-                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[2])), "MSSG_" + mnumber + "_" + dummy[2] + "_" + dummy[3] + "_" + dummy[4], false, dummy[1]); //"MSSG_" + mnumber + "_" + dummy[2] + "_" +dummy[3]
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[2])), "MSSG_" + mnumber + "_" + dummy[2] + "_" + dummy[3] + "_" + dummy[4] + "_F", false, dummy[1]); //"MSSG_" + mnumber + "_" + dummy[2] + "_" +dummy[3]
                                 //test.putExtra("toast_name", "Routed message: " + dummy[3]);
                                 home.Print_IO("Routed from " + dummy[1] + " to " + dummy[2], dummy[4]);
 
@@ -594,9 +611,9 @@ public class FileTransferService extends Service {
                                 tempPacket.distance = dummy[3];
                                 tempPacket.classification = "INTRA";    //just a placeholder. no use anymore
                                 Home.routingService.update(tempPacket);
-                                tempDistance = Integer.parseInt(dummy[3]) + 1;
+                                tempDistance = Integer.parseInt(dummy[3].replaceAll("\\D+","")) + 1;
                                 send_broadcast("DISCO_" + dummy[1] + "_" + mnumber + "_" + tempDistance);
-                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + mnumber + "_1", false, mnumber); //Instance 1
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + mnumber + "_1_F", false, mnumber); //Instance 1
                             }
                                 /*
                             if (!dummy[2].equals(mnumber)) {
@@ -638,19 +655,45 @@ public class FileTransferService extends Service {
                             if (dummy[1].equals(mnumber)) {
                                 tempPacket.phone_number = dummy[3];
                                 tempPacket.direct_connection = dummy[2];
-                                tempPacket.distance = dummy[4];
+                                tempPacket.distance = dummy[4].replaceAll("\\D+","");
                                 tempPacket.classification = "INTRA";    //just a placeholder. no use anymore
                                 Home.routingService.update(tempPacket);
                             } else {
-                                tempDistance = Integer.parseInt(dummy[4]) + 1;
-                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + dummy[3] + "_" + tempDistance, false, mnumber);
+                                tempDistance = Integer.parseInt(dummy[4].replaceAll("\\D+","")) + 1;
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "DISCOREC_" + dummy[1] + "_" + mnumber + "_" + dummy[3] + "_" + tempDistance + "_F", false, mnumber);
                             }
                         } catch (Exception e) {
                            // home.Print_IO("Discovery", e.toString());
 
                         }
 
+                    } else if(dummy[0].equals("PING")){
+                        try {
+                            if (dummy[1].equals(mnumber)) {
+                                //reply to dummy[2] through direct
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])), "PINGREP_" + dummy[1] + "_" + dummy[2] + "_" + dummy [3] + "_F", false, mnumber);
+                            } else {
+                                //relay
+                                sendmessage(Long.parseLong(Home.routingService.getDirectLineAddress(dummy[1])),"PING_" + dummy[1] + "_" + dummy[2] + "_" + dummy[3] + "_F",false,mnumber);
+                            }
+                        } catch (Exception e) {
+                             home.Print_IO("Ping Error", e.toString());
+
+                        }
+                        //@todo PINGREP_[myphoneneumber]_pinged num_[pingID]_dummy
+                    } else if(dummy[0].equals("PINGREC")){
+                        //For returning ping packets,
+                        if (dummy[1].equals(mnumber)) {
+                            //check time vs time start. have 1s timeout .// Ping returned: count increment rec packet variable
+                            //
+                            //home.Print_IO("Ping to " + dummy[2], );
+
+                            //add to ping count.
+                            //if ping count == 500,
+                        }
                     }
+                    //@todo Format: PING_[phone number being pinged]_[from address]_[ping id]_[distance(inthis case 1 for initial)]_dummychar
+
                     /*else if(dummy[0].equals("MULTIGROUP") && dummy[1].equals("START")){
                         test = new Intent();
                         test.setAction("SHOW_TOAST");

@@ -34,6 +34,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -63,6 +64,11 @@ public class Home extends AppCompatActivity{
     public static boolean isHost = false;
     public static boolean fts_started = false;
     public static RoutingService routingService;
+    public static long[] ping_timestamp;
+    public static long timestart;
+    public static long timestop;
+    public static boolean isTimeRunning;
+    long timeout = 1000;
     Intent iRouting;
 
     public static boolean hasPermissions(Context context, String... permissions) {
@@ -119,6 +125,8 @@ public class Home extends AppCompatActivity{
                         public void onGroupInfoAvailable(WifiP2pGroup group) {
                             String passphrase = group.getPassphrase();
                             show_toast("You are a host\nPassword is " + passphrase);
+
+                            Print_IO("GROUP PASSWORD",passphrase);
                         }
                     });
                     ftservice.set_socket_host();
@@ -176,7 +184,7 @@ public class Home extends AppCompatActivity{
                     device_array[i] = device;
                     i++;
                 }
-                compare_connections(device_names.length - 1);
+                //compare_connections(device_names.length - 1);
 
                 //update list
                 /*if(device_names.length > 0) {
@@ -220,6 +228,11 @@ public class Home extends AppCompatActivity{
                 Manifest.permission.CHANGE_WIFI_STATE,
                 Manifest.permission.INTERNET
         };
+
+        File dir = getFilesDir();
+        File x = new File(dir,"Routing table (address, relay, distance)");
+        if(!x.delete())
+            show_toast(x + " DNE");
 
         //Intent testing, do not remove
         rec = new GUI_Receiver(new Handler());
@@ -276,7 +289,8 @@ public class Home extends AppCompatActivity{
             }
         });
 
-        //startService(iRouting); //IAN: Disable for a while... Use only for discovery.
+
+        //startService(iRouting); //Jonas: Disable for a while... Use only for discovery.
     }
 
     public void ShowPopUp(View v){
@@ -344,6 +358,48 @@ public class Home extends AppCompatActivity{
         });
     }
 
+    public void Ping(View v) {
+        dlg.setContentView(R.layout.ping_popup);
+        dlg.show();
+
+        Button send_ping = dlg.findViewById(R.id.send_messg_button);
+
+        send_ping.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        EditText ping_address = (EditText)dlg.findViewById(R.id.ping_number_input);
+                        String strPingAddress = ping_address.getText().toString();
+                        String message= "";
+                        isTimeRunning = false;
+
+                        TelephonyManager tmg = (TelephonyManager)getSystemService(Context.TELEPHONY_SERVICE);
+                        if (ContextCompat.checkSelfPermission(Home.this, Manifest.permission.READ_PHONE_STATE)
+                                != PackageManager.PERMISSION_GRANTED) {
+                            ActivityCompat.requestPermissions(Home.this,
+                                    new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
+                        }
+                        try {
+                            if (fts_started) {
+                                timestart = System.currentTimeMillis();
+                                routingService.startPingTimer(timeout);
+                                for (Integer i = 0; i < 500; i++) {
+
+                                    message = "PING_" + strPingAddress + "_" + FileTransferService.mnumber + "_" + i.toString() + "_F";
+                                    ping_timestamp[i] = System.currentTimeMillis();
+
+                                    ftservice.sendmessage(Long.parseLong(routingService.getDirectLineAddress(strPingAddress)), message, false, strPingAddress);
+
+                                }
+                            }
+                            else show_toast("FTS Not yet started.");
+                            dlg.dismiss();
+                        } catch (Exception e) {
+                            Print_IO("Ping Error", e.toString());
+                        }
+                    }
+        });
+    }
+
     public void New_Messg(View v){
         dlg.setContentView(R.layout.send_message);
         dlg.show();
@@ -371,7 +427,7 @@ public class Home extends AppCompatActivity{
                     // Find "_" charater and change to another character or change the delimiter character to none ascii
                     //remove below if not necessary
                     // @TODO Composition : MSSG_[FROM ADDRESS]_[TO ADDRESS]_[SOURCE NUMBER]_[MESSAGE]
-                    test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" + ftservice.mnumber + "_" + test; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[Original source number]_[message]
+                    test = "MSSG_" + ftservice.mnumber + "_" + send_to_string + "_" + ftservice.mnumber + "_" + test + "_F"; //TODO: NEW MESSAGE FORMAT: MSSG_[my number]_[Destination number]_[Original source number]_[message]
                     if (test.length() > 1024)
                         show_toast("String length > 1024");
                     else {
@@ -516,6 +572,11 @@ public class Home extends AppCompatActivity{
         }
     }
 
+    public void create_group(View v){
+        mManager.createGroup(mChannel,null);
+        dlg.dismiss();
+    }
+
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -541,7 +602,7 @@ public class Home extends AppCompatActivity{
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(Home.this,
                         new String[] {Manifest.permission.READ_PHONE_STATE}, 1);
-            } else routingService = b.getService(tmg.getLine1Number());
+            } else routingService = b.getService(tmg.getLine1Number(), Home.this);
 
             //isBound = true;
         }

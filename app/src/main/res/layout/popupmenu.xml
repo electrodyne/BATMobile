@@ -44,14 +44,27 @@
         android:onClick="Show_IO_Test"
         android:textSize="24sp" />
 
-    <TextView
-        android:id="@+id/tv_ping"
-        android:layout_width="match_parent"
-        android:layout_height="45dp"
-        android:gravity="center"
-        android:background="@color/colorAccent"
-        android:textColor="@color/white"
-        android:text="Ping"
-        android:textSize="24sp" />
+        <TextView
+            android:id="@+id/tv_ping"
+            android:layout_width="match_parent"
+            android:layout_height="45dp"
+            android:gravity="center"
+            android:background="@color/colorAccent"
+            android:textColor="@color/white"
+            android:text="Ping"
+            android:clickable="true"
+            android:onClick="Ping"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/tv_create_group"
+            android:layout_width="match_parent"
+            android:layout_height="45dp"
+            android:gravity="center"
+            android:background="@color/colorPrimary"
+            android:textColor="@color/white"
+            android:text="Create Group"
+            android:onClick="create_group"
+            android:textSize="24sp" />
 </LinearLayout>
 </android.support.constraint.ConstraintLayout>
